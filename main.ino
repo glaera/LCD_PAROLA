@@ -3,9 +3,16 @@
 #include <SPI.h>                    //SPI library for comms
 
 #define MAX_DEVICES 4
-#define CLK_PIN 13
-#define DATA_PIN 11
-#define CS_PIN 10
+//ESP8266
+#define CLK_PIN D3 
+#define DATA_PIN D1
+#define CS_PIN D2 
+
+// arduino mega
+// #define CLK_PIN 13
+// #define DATA_PIN 11
+// #define CS_PIN 10
+
 //MD_Parola P = MD_Parola(CS_PIN, MAX_DEVICES);
 MD_Parola P = MD_Parola(DATA_PIN, CLK_PIN, CS_PIN, MAX_DEVICES);
 
