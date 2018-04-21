@@ -14,9 +14,8 @@ int WAIT_TIME=1000;
 int scrollSpeed;    // used to set text scroll speed in Parola at start
 
 // sets scrolling direction if slider in middle at start
-textEffect_t scrollEffect = PA_SCROLL_RIGHT;
-
-textPosition_t scrollAlign = PA_RIGHT;  // how to aligh the text
+textEffect_t scrollEffect = PA_SCROLL_LEFT; //parameters from Parola library, sets scrolling from left
+textPosition_t scrollAlign = PA_LEFT;
 
 int scrollPause = 0; // ms of pause after finished displaying message
 
@@ -42,7 +41,8 @@ void setup()
 
 void loop(void)
 {
-slider_val = analogRead(A0);  // check slider analog value
+  /*
+  slider_val = analogRead(A0);  // check slider analog value
   
   if (slider_val > 600) {  // if slider to the left
     
@@ -75,12 +75,13 @@ slider_val = analogRead(A0);  // check slider analog value
     
     P.setSpeed(slide_scroll_speed);
   }
-
+  */
 
   if (P.displayAnimate()) // If finished displaying message
   {
     P.displayReset();  // Reset and display it again
   }
+  
 }
 
 
