@@ -95,19 +95,23 @@ void loop(void)
   }
   */
 
-  if (P.displayAnimate()) // If finished displaying message
-  {
-    P.displayReset();  // Reset and display it again
-  }
-
   int sensorValue = digitalRead(SensorPin);
-  if (sensorValue == HIGH) {
+  bool detectedMovement = sensorValue == HIGH;
+  if (detectedMovement) {
     digitalWrite(LedPin, HIGH);
     Serial.println("Movement detected");
   } else {
     digitalWrite(LedPin, LOW);
     Serial.println("No movement detected");
   }
+
+  if (detectedMovement && P.displayAnimate()) // If finished displaying message
+  {
+    P.displayReset();  // Reset and display it again
+  } else if (!detectedMovement) {
+     P.displayClear();
+  }
+
  // delay(50);
 
 }
