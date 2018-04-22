@@ -98,8 +98,6 @@ void setup()
    P.displayClear();                         //MD Parola parameter - clear the display
    P.displaySuspend(false);                  //MD Parola parameter - suspend or not?
 
-  //MD Paroloa display msg using our predefined parameters
-//gennaro   P.displayText(curMessage, scrollAlign, scrollSpeed, scrollPause, scrollEffect, scrollEffect);
 
 
 }
@@ -189,8 +187,6 @@ void loop(void)
 
   if (detectedMovement && P.displayAnimate()) // If finished displaying message
   {
- //gennaro   P.displayReset();  // Reset and display it again
-   // P.displayText(curMessage, scrollAlign, scrollSpeed, scrollPause, scrollEffect, scrollEffect);
   } else if (!detectedMovement) {
     P.displayClear();
     P.displayText("", scrollAlign, scrollSpeed, scrollPause, scrollEffect, scrollEffect);
