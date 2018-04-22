@@ -8,6 +8,10 @@
 #define DATA_PIN D1
 #define CS_PIN D2 
 
+#define SensorPin D5
+#define LedPin D4
+
+
 // arduino mega
 // #define CLK_PIN 13
 // #define DATA_PIN 11
@@ -38,13 +42,17 @@ void setup()
 {
 
  // pinMode(slider_pin, INPUT);
+    pinMode(SensorPin, INPUT);
+    pinMode(LedPin,OUTPUT);
+    Serial.begin(9600);
+
   
    P.begin();                                //MD Parola parameter - begin
-  P.displayClear();                         //MD Parola parameter - clear the display
-  P.displaySuspend(false);                  //MD Parola parameter - suspend or not?
+   P.displayClear();                         //MD Parola parameter - clear the display
+   P.displaySuspend(false);                  //MD Parola parameter - suspend or not?
 
   //MD Paroloa display msg using our predefined parameters
-  P.displayText(curMessage, scrollAlign, scrollSpeed, scrollPause, scrollEffect, scrollEffect);
+   P.displayText(curMessage, scrollAlign, scrollSpeed, scrollPause, scrollEffect, scrollEffect);
 
 
 }
@@ -91,7 +99,17 @@ void loop(void)
   {
     P.displayReset();  // Reset and display it again
   }
-  
+
+  int sensorValue = digitalRead(SensorPin);
+  if (sensorValue == HIGH) {
+    digitalWrite(LedPin, HIGH);
+    Serial.println("Movement detected");
+  } else {
+    digitalWrite(LedPin, LOW);
+    Serial.println("No movement detected");
+  }
+ // delay(50);
+
 }
 
 
