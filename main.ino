@@ -11,7 +11,7 @@
 #include <Timezone.h>
 
 
-#define MAX_DEVICES 4
+#define MAX_DEVICES 8
 //ESP8266
 #define CLK_PIN D3 
 #define DATA_PIN D1
