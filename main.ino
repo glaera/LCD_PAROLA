@@ -9,13 +9,21 @@
 #include <Time.h>
 #include <TimeLib.h>
 #include <Timezone.h>
+#include "Adafruit_MQTT.h"
+#include "Adafruit_MQTT_Client.h" 
 #include "pitches.h"  //add note library
 
 //notes in the melody
-int melody[]={NOTE_C4, NOTE_G3, NOTE_G3, NOTE_A3, NOTE_G3, 0, NOTE_B3, NOTE_C4};
+//int melody[]={NOTE_C4, NOTE_G3, NOTE_G3, NOTE_A3, NOTE_G3, 0, NOTE_B3, NOTE_C4};
+int melody[]={NOTE_D2, NOTE_A2, NOTE_G2, NOTE_G2, NOTE_D2, 0, NOTE_D2,NOTE_A2, NOTE_G2, NOTE_G2};
 //note durations. 4=quarter note / 8=eighth note
-int noteDurations[]={4, 8, 8, 4, 4, 4, 4, 4};
+//int noteDurations[]={4, 8, 8, 4, 4, 4, 4, 4};
+int noteDurations[]={8, 4, 8, 4, 4, 4, 8, 4, 8, 4};
 
+#define AIO_SERVER      "io.adafruit.com"
+#define AIO_SERVERPORT  1883                   // use 8883 for SSL
+#define AIO_USERNAME    "xxx"
+#define AIO_KEY         "xxx"
 
 #define MAX_DEVICES 8
 //ESP8266
@@ -27,7 +35,17 @@ int noteDurations[]={4, 8, 8, 4, 4, 4, 4, 4};
 #define LedPin D4
 
 
+
 WiFiClient client;
+
+// Setup the MQTT client class by passing in the WiFi client and MQTT server and login details.
+Adafruit_MQTT_Client mqtt(&client, AIO_SERVER, AIO_SERVERPORT, AIO_USERNAME, AIO_KEY);
+
+
+// Setup a feed called 'onoff' for subscribing to changes.
+Adafruit_MQTT_Subscribe GRETA_ALARM_TRIGGER = Adafruit_MQTT_Subscribe(&mqtt, AIO_USERNAME "/feeds/gretaalarm");
+
+
 // Define NTP properties
 #define NTP_OFFSET   60 * 60      // In seconds
 #define NTP_INTERVAL 60 * 1000    // In miliseconds
@@ -71,8 +89,8 @@ char curMessage[BUF_SIZE] = { "greta is the best" };  // used to hold current me
 int slider_val;  // used to hold the slider analog value
 int slide_scroll_speed;   // used when changing scroll speed
 
-#define WLAN_SSID       "XXX"
-#define WLAN_PASS       "XXX"
+#define WLAN_SSID       "xxx"
+#define WLAN_PASS       "xxx"
 
 void LanConnect() {
     // Connect to WiFi access point.
@@ -105,7 +123,8 @@ void setup()
    P.displayClear();                         //MD Parola parameter - clear the display
    P.displaySuspend(false);                  //MD Parola parameter - suspend or not?
 
-
+   // Setup MQTT subscription for onoff feed.
+  mqtt.subscribe(&GRETA_ALARM_TRIGGER);
 
 }
 
@@ -149,13 +168,13 @@ void updateTime()
     t += ampm[isPM(local)];
 
     // Display the date and time
-    Serial.println("");
-    Serial.print("Local date: ");
-    Serial.print(date);
-    Serial.println("");
-    Serial.print("Local time: ");
-    Serial.print(t);
-
+  //  Serial.println("");
+  //  Serial.print("Local date: ");
+  //  Serial.print(date);
+  //  Serial.println("");
+  //  Serial.print("Local time: ");
+  //  Serial.print(t);
+    
     String myMessage = t + " "+ date+" ";
     //char charBuf[myMessage.length() + 1];
     myMessage.toCharArray(curMessage, myMessage.length());
@@ -181,6 +200,8 @@ void updateTime()
 void loop(void)
 {
 
+  MQTT_connect();
+  readMQTTMessages();
   int sensorValue = digitalRead(SensorPin);
   bool detectedMovement = sensorValue == HIGH;
   if (detectedMovement) {
@@ -196,7 +217,7 @@ void loop(void)
   if (detectedMovement && P.displayAnimate()) // If finished displaying message
   {
   } else if (!detectedMovement) {
-     Serial.println("can you see?");
+    // Serial.println("can you see?");
     P.displayClear();
     P.displayText("", scrollAlign, scrollSpeed, scrollPause, scrollEffect, scrollEffect);
   }
@@ -207,9 +228,10 @@ void loop(void)
 
 void playMelody()
 {
+    Serial.println("play melody starts");
 
   //iterate over the notes of the melody
-    for (int thisNote=0; thisNote <BUZZER_PIN; thisNote++){
+    for (int thisNote=0; thisNote < 10; thisNote++){
 
       //to calculate the note duration, take one second. Divided by the note type
       int noteDuration = 1000 / noteDurations [thisNote];
@@ -223,6 +245,46 @@ void playMelody()
       //stop the tone playing
       noTone(BUZZER_PIN);
     }
+    noTone(BUZZER_PIN);
+    analogWrite(BUZZER_PIN, 0);
+
+
+    Serial.println("play melody ends");
+
 }
 
+
+// Function to connect and reconnect as necessary to the MQTT server.
+// Should be called in the loop function and it will take care if connecting.
+void MQTT_connect() {
+  int8_t ret;
+  // Stop if already connected.
+  if (mqtt.connected()) {
+    return;
+  }
+  Serial.print("Connecting to MQTT... ");
+  uint8_t retries = 3;
+  while ((ret = mqtt.connect()) != 0) { // connect will return 0 for connected
+       Serial.println(mqtt.connectErrorString(ret));
+       Serial.println("Retrying MQTT connection in 5 seconds...");
+       mqtt.disconnect();
+       delay(5000);  // wait 5 seconds
+       retries--;
+       if (retries == 0) {
+         // basically die and wait for WDT to reset me
+         while (1);
+       }
+  }
+  Serial.println("MQTT Connected!");
+}
+
+
+void readMQTTMessages() {
+  
+    Adafruit_MQTT_Subscribe *subscription;
+    subscription = mqtt.readSubscription(1);
+    if (subscription == &GRETA_ALARM_TRIGGER) {
+        playMelody();
+      }
+}
 
