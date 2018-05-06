@@ -9,6 +9,12 @@
 #include <Time.h>
 #include <TimeLib.h>
 #include <Timezone.h>
+#include "pitches.h"  //add note library
+
+//notes in the melody
+int melody[]={NOTE_C4, NOTE_G3, NOTE_G3, NOTE_A3, NOTE_G3, 0, NOTE_B3, NOTE_C4};
+//note durations. 4=quarter note / 8=eighth note
+int noteDurations[]={4, 8, 8, 4, 4, 4, 4, 4};
 
 
 #define MAX_DEVICES 8
@@ -42,6 +48,8 @@ const char * ampm[] = {"AM", "PM"} ;
 // #define DATA_PIN 11
 // #define CS_PIN 10
 
+#define BUZZER_PIN D6
+
 //MD_Parola P = MD_Parola(CS_PIN, MAX_DEVICES);
 MD_Parola P = MD_Parola(DATA_PIN, CLK_PIN, CS_PIN, MAX_DEVICES);
 
@@ -63,8 +71,8 @@ char curMessage[BUF_SIZE] = { "greta is the best" };  // used to hold current me
 int slider_val;  // used to hold the slider analog value
 int slide_scroll_speed;   // used when changing scroll speed
 
-#define WLAN_SSID       "x"
-#define WLAN_PASS       "x"
+#define WLAN_SSID       "XXX"
+#define WLAN_PASS       "XXX"
 
 void LanConnect() {
     // Connect to WiFi access point.
@@ -86,7 +94,6 @@ void setup()
 
     Serial.begin(9600);  
     timeClient.begin();   // Start the NTP UDP client
-  
 
     LanConnect();
 
@@ -178,16 +185,18 @@ void loop(void)
   bool detectedMovement = sensorValue == HIGH;
   if (detectedMovement) {
     updateTime();
+    //playMelody();
     digitalWrite(LedPin, HIGH);
  //   Serial.println("Movement detected");
   } else {
     digitalWrite(LedPin, LOW);
- //   Serial.println("No movement detected");
+  //  Serial.println("No movement detected");
   }
 
   if (detectedMovement && P.displayAnimate()) // If finished displaying message
   {
   } else if (!detectedMovement) {
+     Serial.println("can you see?");
     P.displayClear();
     P.displayText("", scrollAlign, scrollSpeed, scrollPause, scrollEffect, scrollEffect);
   }
@@ -196,5 +205,24 @@ void loop(void)
 
 }
 
+void playMelody()
+{
+
+  //iterate over the notes of the melody
+    for (int thisNote=0; thisNote <BUZZER_PIN; thisNote++){
+
+      //to calculate the note duration, take one second. Divided by the note type
+      int noteDuration = 1000 / noteDurations [thisNote];
+      tone(BUZZER_PIN, melody [thisNote], noteDuration);
+
+      //to distinguish the notes, set a minimum time between them
+      //the note's duration +30% seems to work well
+      int pauseBetweenNotes = noteDuration * 1.30;
+      delay(pauseBetweenNotes);
+
+      //stop the tone playing
+      noTone(BUZZER_PIN);
+    }
+}
 
 
