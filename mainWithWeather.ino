@@ -14,7 +14,7 @@
 #include <ArduinoJson.h>
 #include "pitches.h"  //add note library
 
-String API_key       = "003f05d477655a2c";           // See: http://www.wunderground.com/weather/api/d/docs (change here with your KEY)
+String API_key       = "XXX";           // See: http://www.wunderground.com/weather/api/d/docs (change here with your KEY)
 String City          = "Baden";                    // Your home city
 String Country       = "CH";                         // Your country  
 String Language      = "EN";                         // See here for the Language codes:  https://www.wunderground.com/weather/api/d/docs?d=language-support
@@ -22,7 +22,7 @@ char   wxserver[]    = "api.wunderground.com";
 
 unsigned long        lastWeatherConnectionTime = 0;         // Last time you connected to the server, in milliseconds
 const unsigned long  postingWeatherInterval = 20*60L*1000L;
-String wx_forecast;
+String wx_forecast,DHtemp0,DLtemp0;
 
 
 //notes in the melody
@@ -101,8 +101,8 @@ char curMessage[BUF_SIZE] = { "greta is the best" };  // used to hold current me
 int slider_val;  // used to hold the slider analog value
 int slide_scroll_speed;   // used when changing scroll speed
 
-#define WLAN_SSID       "xxxx"
-#define WLAN_PASS       "xxxx"
+#define WLAN_SSID       "xxx"
+#define WLAN_PASS       "xxx"
 
 void LanConnect() {
     // Connect to WiFi access point.
@@ -174,7 +174,7 @@ void updateTime()
     date += ", ";
     date += year(local);
 
-    date += " Forecast for "+City+": "+ wx_forecast;
+    date += "  "+City+": "+ wx_forecast +" High: "+DHtemp0 +" Low: "+DLtemp0;
 
     // format the time to 12-hour format with AM/PM and no seconds
     t += hourFormat12(local);
@@ -186,12 +186,12 @@ void updateTime()
     t += ampm[isPM(local)];
 
     // Display the date and time
-  //  Serial.println("");
-  //  Serial.print("Local date: ");
-  //  Serial.print(date);
-  //  Serial.println("");
-  //  Serial.print("Local time: ");
-  //  Serial.print(t);
+    Serial.println("");
+    Serial.print("Local date: ");
+    Serial.print(date);
+    Serial.println("");
+    Serial.print("Local time: ");
+    Serial.print(t);
 
     if (millis() - lastWeatherConnectionTime > postingWeatherInterval) { // 20-minutes
       get_wx_data("forecast");
@@ -398,8 +398,12 @@ bool extract_forecast(char *json) {
     // Extract weather info from parsed JSON
   JsonObject& wxforecast = root["forecast"]["txt_forecast"];
   String fcttext0 = wxforecast["forecastday"][0]["fcttext_metric"]; 
-  wx_forecast = fcttext0;
   JsonObject& forecast = root["forecast"]["simpleforecast"];
+  int Htemp0      = forecast["forecastday"][0]["high"]["celsius"];         
+  DHtemp0     = String(Htemp0) +"C.";
+  int Ltemp0      = forecast["forecastday"][0]["low"]["celsius"];          
+  DLtemp0     = String(Ltemp0) +"C.";
+  wx_forecast = fcttext0;
 
   
 }
