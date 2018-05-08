@@ -14,7 +14,7 @@
 #include <ArduinoJson.h>
 #include "pitches.h"  //add note library
 
-String API_key       = "xxxxx";           // See: http://www.wunderground.com/weather/api/d/docs (change here with your KEY)
+String API_key       = "xxx";           // See: http://www.wunderground.com/weather/api/d/docs (change here with your KEY)
 String City          = "Baden";                    // Your home city
 String Country       = "CH";                         // Your country  
 String Language      = "EN";                         // See here for the Language codes:  https://www.wunderground.com/weather/api/d/docs?d=language-support
@@ -226,6 +226,9 @@ void updateMessageDisplay()
     
 }
 
+
+unsigned long lastMovementDetectedTime = 0;
+
 void loop(void)
 {
 
@@ -234,6 +237,15 @@ void loop(void)
   int sensorValue = digitalRead(SensorPin);
   bool detectedMovement = sensorValue == HIGH;
   if (detectedMovement) {
+    Serial.print("Movement detected ");
+    if (millis() - lastMovementDetectedTime > 30000) {
+      //Serial.print("Movement detected ");
+      lastMovementDetectedTime = millis();
+    }
+  }
+  bool shouldUpdateMessage =  (millis() - lastMovementDetectedTime < 27000);
+  
+  if (shouldUpdateMessage) {
     updateMessageDisplay();
     //playMelody();
     digitalWrite(LedPin, HIGH);
@@ -242,10 +254,11 @@ void loop(void)
     digitalWrite(LedPin, LOW);
   //  Serial.println("No movement detected");
   }
+  
 
-  if (detectedMovement && P.displayAnimate()) // If finished displaying message
+  if (shouldUpdateMessage && P.displayAnimate()) // If finished displaying message
   {
-  } else if (!detectedMovement) {
+  } else if (!shouldUpdateMessage) {
     // Serial.println("can you see?");
     P.displayClear();
     P.displayText("", scrollAlign, scrollSpeed, scrollPause, scrollEffect, scrollEffect);
