@@ -11,7 +11,19 @@
 #include <Timezone.h>
 #include "Adafruit_MQTT.h"
 #include "Adafruit_MQTT_Client.h" 
+#include <ArduinoJson.h>
 #include "pitches.h"  //add note library
+
+String API_key       = "xxxx";           // See: http://www.wunderground.com/weather/api/d/docs (change here with your KEY)
+String City          = "Baden";                    // Your home city
+String Country       = "CH";                         // Your country  
+String Language      = "EN";                         // See here for the Language codes:  https://www.wunderground.com/weather/api/d/docs?d=language-support
+char   wxserver[]    = "api.wunderground.com";
+
+unsigned long        lastWeatherConnectionTime = 0;         // Last time you connected to the server, in milliseconds
+const unsigned long  postingWeatherInterval = 20*60L*1000L;
+String wx_forecast,DHtemp0,DLtemp0;
+
 
 //notes in the melody
 //int melody[]={NOTE_C4, NOTE_G3, NOTE_G3, NOTE_A3, NOTE_G3, 0, NOTE_B3, NOTE_C4};
@@ -23,7 +35,7 @@ int noteDurations[]={8, 4, 8, 4, 4, 4, 8, 4, 8, 4};
 #define AIO_SERVER      "io.adafruit.com"
 #define AIO_SERVERPORT  1883                   // use 8883 for SSL
 #define AIO_USERNAME    "xxx"
-#define AIO_KEY         "xxx"
+#define AIO_KEY         "xxxxx"
 
 #define MAX_DEVICES 8
 //ESP8266
@@ -57,7 +69,7 @@ NTPClient timeClient(ntpUDP, NTP_ADDRESS, NTP_OFFSET, NTP_INTERVAL);
 
 String date;
 String t;
-const char * days[] = {"Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"} ;
+const char * days[] = {"Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"} ;
 const char * months[] = {"Jan", "Feb", "Mar", "Apr", "May", "June", "July", "Aug", "Sep", "Oct", "Nov", "Dec"} ;
 const char * ampm[] = {"AM", "PM"} ;
 
@@ -81,7 +93,7 @@ textPosition_t scrollAlign = PA_LEFT;
 
 int scrollPause = 1000; // ms of pause after finished displaying message
 
-#define  BUF_SIZE  75  // Maximum of 75 characters
+#define  BUF_SIZE  175  // Maximum of 75 characters
 char curMessage[BUF_SIZE] = { "greta is the best" };  // used to hold current message
 
 
@@ -90,7 +102,7 @@ int slider_val;  // used to hold the slider analog value
 int slide_scroll_speed;   // used when changing scroll speed
 
 #define WLAN_SSID       "xxx"
-#define WLAN_PASS       "xxx"
+#define WLAN_PASS       "xxxxx"
 
 void LanConnect() {
     // Connect to WiFi access point.
@@ -115,6 +127,8 @@ void setup()
 
     LanConnect();
 
+    
+
     pinMode(SensorPin, INPUT);
     pinMode(LedPin,OUTPUT);
     
@@ -124,11 +138,13 @@ void setup()
    P.displaySuspend(false);                  //MD Parola parameter - suspend or not?
 
    // Setup MQTT subscription for onoff feed.
-  mqtt.subscribe(&GRETA_ALARM_TRIGGER);
+   mqtt.subscribe(&GRETA_ALARM_TRIGGER);
+   get_wx_data("forecast");
+   lastWeatherConnectionTime = millis();
 
 }
 
-void updateTime() 
+void updateMessageDisplay() 
 {
   if (WiFi.status() == WL_CONNECTED) //Check WiFi connection status
   {   
@@ -158,6 +174,7 @@ void updateTime()
     date += ", ";
     date += year(local);
 
+    
     // format the time to 12-hour format with AM/PM and no seconds
     t += hourFormat12(local);
     t += ":";
@@ -168,14 +185,20 @@ void updateTime()
     t += ampm[isPM(local)];
 
     // Display the date and time
-  //  Serial.println("");
-  //  Serial.print("Local date: ");
-  //  Serial.print(date);
-  //  Serial.println("");
-  //  Serial.print("Local time: ");
-  //  Serial.print(t);
-    
-    String myMessage = t + " "+ date+" ";
+    Serial.println("");
+    Serial.print("Local date: ");
+    Serial.print(date);
+    Serial.println("");
+    Serial.print("Local time: ");
+    Serial.print(t);
+
+    if (millis() - lastWeatherConnectionTime > postingWeatherInterval) { // 20-minutes
+      get_wx_data("forecast");
+      lastWeatherConnectionTime = millis();
+    }
+        
+    String myMessage = t + " "+ date+" "+City+": "+ wx_forecast +" High: "+DHtemp0 +" Low: "+DLtemp0+" ";
+
     //char charBuf[myMessage.length() + 1];
     myMessage.toCharArray(curMessage, myMessage.length());
     
@@ -205,7 +228,7 @@ void loop(void)
   int sensorValue = digitalRead(SensorPin);
   bool detectedMovement = sensorValue == HIGH;
   if (detectedMovement) {
-    updateTime();
+    updateMessageDisplay();
     //playMelody();
     digitalWrite(LedPin, HIGH);
  //   Serial.println("Movement detected");
@@ -287,4 +310,102 @@ void readMQTTMessages() {
         playMelody();
       }
 }
+
+char* get_wx_data (String request_type) {
+  static char RxBuf[8704];
+  String request;
+  request  = "GET /api/" + API_key + "/"+ request_type + "/lang:" + Language + "/q/" + Country + "/" + City + ".json HTTP/1.1\r\n";
+  request += F("User-Agent: Weather Webserver v2.0\r\n");
+  request += F("Accept: */*\r\n");
+  request += "Host: " + String(wxserver) + "\r\n";
+  request += F("Connection: close\r\n");
+  request += F("\r\n");
+  Serial.println(request);
+  Serial.print(F("Connecting to ")); Serial.println(wxserver);
+  // Use WiFiClient class to create TCP connections
+  WiFiClient httpclient;
+  if (!httpclient.connect(wxserver, 80)) {
+    Serial.println(F("connection failed"));
+ //   delay(DELAY_ERROR);
+    return RxBuf;
+  }
+
+   Serial.print(request);
+  httpclient.print(request); //send the http request to the server
+  httpclient.flush();
+  // Collect http response headers and content from Weather Underground, discard HTTP headers, leaving JSON formatted information returned in RxBuf.
+  int    respLen = 0;
+  bool   skip_headers = true;
+  String rx_line;
+  while (httpclient.connected() || httpclient.available()) {
+    if (skip_headers) {
+      rx_line = httpclient.readStringUntil('\n'); //Serial.println(rx_line);
+      if (rx_line.length() <= 1) { // a blank line denotes end of headers
+        skip_headers = false;
+      }
+    }
+    else {
+      int bytesIn;
+      bytesIn = httpclient.read((uint8_t *)&RxBuf[respLen], sizeof(RxBuf) - respLen);
+      //Serial.print(F("bytesIn ")); Serial.println(bytesIn);
+      if (bytesIn > 0) {
+        respLen += bytesIn;
+        if (respLen > (int)sizeof(RxBuf)) respLen = sizeof(RxBuf);
+      }
+      else if (bytesIn < 0) {
+        Serial.print(F("read error "));
+        Serial.println(bytesIn);
+      }
+    }
+    delay(1);
+  }
+  httpclient.stop();
+  
+  if (respLen >= (int)sizeof(RxBuf)) {
+    Serial.print(F("RxBuf overflow ")); Serial.println(respLen);
+    //delay(DELAY_ERROR);
+    return RxBuf;
+  }
+
+   RxBuf[respLen++] = '\0'; // Terminate the C string
+  Serial.print(F("respLen ")); 
+  Serial.println(respLen); 
+  //Serial.println(RxBuf);
+  if (request_type == "forecast"){
+    extract_forecast(RxBuf);
+  }
+  
+  return RxBuf;  
+}
+
+bool extract_forecast(char *json) {
+    DynamicJsonBuffer jsonBuffer(8704);
+  char *jsonstart = strchr(json, '{');
+  //Serial.print(F("jsonstart ")); Serial.println(jsonstart);
+  if (jsonstart == NULL) {
+    Serial.println(F("JSON data missing"));
+    return false;
+  }
+  json = jsonstart;
+
+    // Parse JSON
+  JsonObject& root = jsonBuffer.parseObject(json);
+  if (!root.success()) {
+    Serial.println(F("jsonBuffer.parseObject() failed"));
+    return false;
+  }
+
+    // Extract weather info from parsed JSON
+  JsonObject& wxforecast = root["forecast"]["txt_forecast"];
+  String fcttext0 = wxforecast["forecastday"][0]["fcttext_metric"]; 
+  JsonObject& forecast = root["forecast"]["simpleforecast"];
+  int Htemp0      = forecast["forecastday"][0]["high"]["celsius"];         
+  DHtemp0     = String(Htemp0) +"C.";
+  int Ltemp0      = forecast["forecastday"][0]["low"]["celsius"];          
+  DLtemp0     = String(Ltemp0) +"C.";
+  wx_forecast = fcttext0;
+
+  
+}
+
 
