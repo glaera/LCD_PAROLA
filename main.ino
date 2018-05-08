@@ -14,15 +14,18 @@
 #include <ArduinoJson.h>
 #include "pitches.h"  //add note library
 
-String API_key       = "xxxx";           // See: http://www.wunderground.com/weather/api/d/docs (change here with your KEY)
+String API_key       = "xxxxx";           // See: http://www.wunderground.com/weather/api/d/docs (change here with your KEY)
 String City          = "Baden";                    // Your home city
 String Country       = "CH";                         // Your country  
 String Language      = "EN";                         // See here for the Language codes:  https://www.wunderground.com/weather/api/d/docs?d=language-support
 char   wxserver[]    = "api.wunderground.com";
 
+unsigned long lastTimeFetchTime = 0;
+#define postingTimeInterval  15L*1000L
 unsigned long        lastWeatherConnectionTime = 0;         // Last time you connected to the server, in milliseconds
 const unsigned long  postingWeatherInterval = 20*60L*1000L;
 String wx_forecast,DHtemp0,DLtemp0;
+String myMessage;
 
 
 //notes in the melody
@@ -35,7 +38,7 @@ int noteDurations[]={8, 4, 8, 4, 4, 4, 8, 4, 8, 4};
 #define AIO_SERVER      "io.adafruit.com"
 #define AIO_SERVERPORT  1883                   // use 8883 for SSL
 #define AIO_USERNAME    "xxx"
-#define AIO_KEY         "xxxxx"
+#define AIO_KEY         "xxx"
 
 #define MAX_DEVICES 8
 //ESP8266
@@ -102,7 +105,7 @@ int slider_val;  // used to hold the slider analog value
 int slide_scroll_speed;   // used when changing scroll speed
 
 #define WLAN_SSID       "xxx"
-#define WLAN_PASS       "xxxxx"
+#define WLAN_PASS       "xxx"
 
 void LanConnect() {
     // Connect to WiFi access point.
@@ -147,58 +150,61 @@ void setup()
 void updateMessageDisplay() 
 {
   if (WiFi.status() == WL_CONNECTED) //Check WiFi connection status
-  {   
-    date = "";  // clear the variables
-    t = "";
-    
-    // update the NTP client and get the UNIX UTC timestamp 
-    timeClient.update();
-    unsigned long epochTime =  timeClient.getEpochTime();
-
-    // convert received time stamp to time_t object
-    time_t local, utc;
-    utc = epochTime;
-
-    // Then convert the UTC UNIX timestamp to local time
-    TimeChangeRule usEDT = {"CEST", Second, Sun, Mar, 2, 60};  //UTC - 5 hours - change this as needed
-    TimeChangeRule usEST = {"CEST", First, Sun, Nov, 2, 60};   //UTC - 6 hours - change this as needed
-    Timezone usEastern(usEDT, usEST);
-    local = usEastern.toLocal(utc);
-
-    // now format the Time variables into strings with proper names for month, day etc
-    date += days[weekday(local)-1];
-    date += ", ";
-    date += months[month(local)-1];
-    date += " ";
-    date += day(local);
-    date += ", ";
-    date += year(local);
-
-    
-    // format the time to 12-hour format with AM/PM and no seconds
-    t += hourFormat12(local);
-    t += ":";
-    if(minute(local) < 10)  // add a zero if minute is under 10
-      t += "0";
-    t += minute(local);
-    t += " ";
-    t += ampm[isPM(local)];
-
-    // Display the date and time
-    Serial.println("");
-    Serial.print("Local date: ");
-    Serial.print(date);
-    Serial.println("");
-    Serial.print("Local time: ");
-    Serial.print(t);
-
-    if (millis() - lastWeatherConnectionTime > postingWeatherInterval) { // 20-minutes
-      get_wx_data("forecast");
-      lastWeatherConnectionTime = millis();
+  { 
+    if (millis() - lastTimeFetchTime > 15000 ) { 
+      lastTimeFetchTime = millis();
+       
+      date = "";  // clear the variables
+      t = "";
+      
+      // update the NTP client and get the UNIX UTC timestamp 
+      timeClient.update();
+      unsigned long epochTime =  timeClient.getEpochTime();
+  
+      // convert received time stamp to time_t object
+      time_t local, utc;
+      utc = epochTime;
+  
+      // Then convert the UTC UNIX timestamp to local time
+      TimeChangeRule usEDT = {"CEST", Second, Sun, Mar, 2, 60};  //UTC - 5 hours - change this as needed
+      TimeChangeRule usEST = {"CEST", First, Sun, Nov, 2, 60};   //UTC - 6 hours - change this as needed
+      Timezone usEastern(usEDT, usEST);
+      local = usEastern.toLocal(utc);
+  
+      // now format the Time variables into strings with proper names for month, day etc
+      date += days[weekday(local)-1];
+      date += ", ";
+      date += months[month(local)-1];
+      date += " ";
+      date += day(local);
+      date += ", ";
+      date += year(local);
+  
+      
+      // format the time to 12-hour format with AM/PM and no seconds
+      t += hourFormat12(local);
+      t += ":";
+      if(minute(local) < 10)  // add a zero if minute is under 10
+        t += "0";
+      t += minute(local);
+      t += " ";
+      t += ampm[isPM(local)];
+  
+      // Display the date and time
+      Serial.println("");
+      Serial.print("Local date: ");
+      Serial.print(date);
+      Serial.println("");
+      Serial.print("Local time: ");
+      Serial.print(t);
+  
+      if (millis() - lastWeatherConnectionTime > postingWeatherInterval) { // 20-minutes
+        get_wx_data("forecast");
+        lastWeatherConnectionTime = millis();
+      }
+          
+      myMessage = t + " "+ date+" "+City+": "+ wx_forecast +" High: "+DHtemp0 +" Low: "+DLtemp0+" ";
     }
-        
-    String myMessage = t + " "+ date+" "+City+": "+ wx_forecast +" High: "+DHtemp0 +" Low: "+DLtemp0+" ";
-
     //char charBuf[myMessage.length() + 1];
     myMessage.toCharArray(curMessage, myMessage.length());
     
